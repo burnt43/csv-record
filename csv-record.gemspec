@@ -8,4 +8,6 @@ Gem::Specification.new do |s|
   s.homepage    = "http://tmpurl.com"
   s.files       = ['lib/csv-record.rb']
   s.license     = 'MIT'
+  s.add_runtime_dependency 'activesupport'
+  s.add_runtime_dependency 'hashie'
 end
