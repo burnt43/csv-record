@@ -2,6 +2,12 @@ require 'hashie'
 require 'active_support'
 require 'active_support/core_ext/object/blank'
 
+module Kernel
+  def jcarson_debug(msg)
+    puts "[JCARSON] - \033[0;32m#{msg}\033[0;0m"
+  end
+end
+
 module CsvRecord
   class Base
     attr_reader :attribute_mash
@@ -43,6 +49,13 @@ module CsvRecord
         @index_options || {}
       end
 
+      def modify_attribute_name(new_name, old_name)
+        (@modify_attribute_name_config ||= {})[old_name.to_sym] = new_name.to_sym
+      end
+      def modify_attribute_name_config
+        @modify_attribute_name_config || {}
+      end
+
       # association methods
 
       # TODO: guess missing options based on convention
@@ -81,13 +94,17 @@ module CsvRecord
 
       # finder methods
       def find_all_by(attribute_values={})
-        []
+        master_find_by(false, attribute_values)
       end
 
       def find_by(attribute_values={})
+        master_find_by(true, attribute_values)
+      end
+
+      def master_find_by(singular=true, attribute_values={})
         if attribute_values.size == 0
           # nothing is given, so return nothing
-          nil
+          singular ? nil : []
         elsif attribute_values.size == 1
           # 1 key/value pair was given, so try to see if there is
           # an index on the key and use the index if possible, otherwise
@@ -96,14 +113,19 @@ module CsvRecord
           attribute_value = attribute_values.values.first
 
           if index_options.key?(attribute_name)
-            all(indexed_by: attribute_name)[attribute_value]
+            result = all(indexed_by: attribute_name)[attribute_value]
+            singular ? result : Array(result)
           else
-            all.find {|object| object.send(attribute_name) == attribute_value}
+            method_name = singular ? :find : :find_all
+
+            all.send(method_name) {|object| object.send(attribute_name) == attribute_value}
           end
         else
           # multiple key/values were given. instead of doing some fancy
           # stuff with multiple potential indexes, just do a slow linear search.
-          all.find do |object|
+          method_name = singular ? :find : :find_all
+
+          all.send(method_name) do |object|
             attribute_values.all do |attribute_name, attribute_value|
               object.send(attribute_name) == attribute_value
             end
@@ -129,21 +151,35 @@ module CsvRecord
       end
 
       # helper methods
-      def safe_data_name(input)
-        result = ActiveSupport::Inflector.underscore(input)
-          .gsub(/\s+/, '_')      # white space becomes a single underscore
-          .gsub(/[\.\+]/, '')    # . and + are removed
-          .gsub(/\//, '_')       # / becomes _
-          .gsub(/#/, '_number')  # # becomes _number
+      def schemaize_attribute_name(input)
+        # REVIEW: this conversion is some stuff that was necessary for 1 certain
+        # project, but maybe it should not exist at all and be configurable by the
+        # users of this library.
 
-        case result
-        when "open"
-          "opened"
-        when "class"
-          "klass"
+        result =
+          ActiveSupport::Inflector
+          .underscore(input)
+          .gsub(%r/\s+/, '_')      # white space becomes a single underscore
+          .gsub(%r/[\.\+]/, '')    # . and + are removed
+          .gsub(%r/\//, '_')       # / becomes _
+          .gsub(%r/#/, '_number')  # # becomes _number
+          .sub(%r/_\z/, '')        # trailing underscores are removed for Hashie compatibility
+
+        if modify_attribute_name_config.key?(result.to_sym)
+          modify_attribute_name_config[result.to_sym].to_s
         else
           result
         end
+      end
+
+      def stored_attribute_name(input)
+        reserved_ruby_method_conversion =
+          case input
+          when 'class' then 'klass'
+          else input
+          end
+
+        "__#{reserved_ruby_method_conversion}"
       end
 
       # csv methods
@@ -168,7 +204,7 @@ module CsvRecord
               if line_number == 1 && first_line_contains_schema_info?
                 case schema_type
                 when :names
-                  schema = csv_record_buffer.map {|attribute_name| safe_data_name(attribute_name)}
+                  schema = csv_record_buffer.map {|attribute_name| schemaize_attribute_name(attribute_name)}
                 end
               else
                 attribute_mash = Hashie::Mash.new
@@ -176,11 +212,13 @@ module CsvRecord
                 case data_type
                 when :name_value_pairs
                   csv_record_buffer.each_slice(2).each do |name, value|
-                    attribute_mash[safe_data_name(name)] = value
+                    attribute_name = stored_attribute_name(schemaize_attribute_name(name))
+                    attribute_mash[attribute_name] = value
                   end
                 when :values
                   schema.zip(csv_record_buffer).each do |name, value|
-                    attribute_mash[safe_data_name(name)] = value
+                    attribute_name = stored_attribute_name(name)
+                    attribute_mash[attribute_name] = value
                   end
                 end
 
@@ -253,7 +291,6 @@ module CsvRecord
             end
             current_char += 1
           }
-          puts ''
 
           result
         )
@@ -265,9 +302,16 @@ module CsvRecord
       @attribute_mash = attribute_mash
     end
 
+    def attributes
+      @attribute_mash.to_hash
+    end
+
     def method_missing(method_name, *args, &block)
-      # delegate to the mash object
-      @attribute_mash.send(method_name, *args, &block)
+      unless method_name.to_s.end_with?('=')
+        # Assume this method is a lookup of an attribute and
+        # delegate to the mash object.
+        @attribute_mash.send(self.class.stored_attribute_name(method_name), *args, &block)
+      end
     end
   end # Base
 
