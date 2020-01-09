@@ -147,7 +147,12 @@ module CsvRecord
 
       # schema methods
       def attribute_names
-        all.first.attribute_mash.keys
+        load_csv! unless csv_loaded?
+        @attribute_names
+      end
+
+      def potential_foreign_key_attribute_names
+        attribute_names.select {|name| name.end_with?('id')}
       end
 
       # helper methods
@@ -160,7 +165,7 @@ module CsvRecord
           ActiveSupport::Inflector
           .underscore(input)
           .gsub(%r/\s+/, '_')      # white space becomes a single underscore
-          .gsub(%r/[\.\+]/, '')    # . and + are removed
+          .gsub(%r/[\.\+\|]/, '')  # characters to remove
           .gsub(%r/\//, '_')       # / becomes _
           .gsub(%r/#/, '_number')  # # becomes _number
           .sub(%r/_\z/, '')        # trailing underscores are removed for Hashie compatibility
@@ -183,10 +188,23 @@ module CsvRecord
       end
 
       # csv methods
+      def csv_loaded?
+        !@csv_data.nil?
+      end
+
+      def load_csv!
+        if csv_loaded?
+          false
+        else
+          csv_data
+          true
+        end
+      end
+
       def csv_data
         @csv_data ||= (
           result            = {unindexed:  [], indexed_by: {}}
-          schema            = []
+          @attribute_names  = []
           raw_file_string   = IO.read(csv_filename).force_encoding('iso-8859-1')
           line_number       = 1
           parse_state       = :outside_quote
@@ -204,7 +222,7 @@ module CsvRecord
               if line_number == 1 && first_line_contains_schema_info?
                 case schema_type
                 when :names
-                  schema = csv_record_buffer.map {|attribute_name| schemaize_attribute_name(attribute_name)}
+                  @attribute_names = csv_record_buffer.map {|attribute_name| schemaize_attribute_name(attribute_name)}
                 end
               else
                 attribute_mash = Hashie::Mash.new
@@ -213,12 +231,13 @@ module CsvRecord
                 when :name_value_pairs
                   csv_record_buffer.each_slice(2).each do |name, value|
                     attribute_name = stored_attribute_name(schemaize_attribute_name(name))
-                    attribute_mash[attribute_name] = value
+                    @attribute_names.push(attribute_name)
+                    attribute_mash[attribute_name] = value&.strip
                   end
                 when :values
-                  schema.zip(csv_record_buffer).each do |name, value|
+                  @attribute_names.zip(csv_record_buffer).each do |name, value|
                     attribute_name = stored_attribute_name(name)
-                    attribute_mash[attribute_name] = value
+                    attribute_mash[attribute_name] = value&.strip
                   end
                 end
 
@@ -304,6 +323,26 @@ module CsvRecord
 
     def attributes
       @attribute_mash.to_hash
+    end
+
+    def print_attributes(
+      only: [],
+      except: []
+    )
+      collection =
+        if !only.empty?
+          only_as_stored = only.map {|attr| self.class.stored_attribute_name(attr)}
+          attributes.slice(*only_as_stored)
+        elsif !except.empty?
+          except_as_stored = except.map {|attr| self.class.stored_attribute_name(attr)}
+          attributes.except(*except_as_stored)
+        else
+          attributes
+        end
+
+      collection.each do |attribute_name, attribute_value|
+        printf("%-40s %-40s\n", attribute_name, attribute_value)
+      end
     end
 
     def method_missing(method_name, *args, &block)
