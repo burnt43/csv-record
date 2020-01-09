@@ -1,6 +1,6 @@
 require 'hashie'
-require 'active_support'
 require 'active_support/core_ext/object/blank'
+require 'active_support/core_ext/string/inflections'
 
 module Kernel
   def jcarson_debug(msg)
@@ -162,8 +162,8 @@ module CsvRecord
         # users of this library.
 
         result =
-          ActiveSupport::Inflector
-          .underscore(input)
+          input
+          .underscore
           .gsub(%r/\s+/, '_')      # white space becomes a single underscore
           .gsub(%r/[\.\+\|]/, '')  # characters to remove
           .gsub(%r/\//, '_')       # / becomes _
@@ -358,21 +358,25 @@ module CsvRecord
     class AssociationReflection
       attr_reader :name
 
-      def initialize(name, association_options={})
+      def initialize(name, options={})
         @name = name
-        @association_options = association_options
+        @options = options
+      end
+
+      def class_name
+        @options[:class_name] || @name.to_s.classify
       end
 
       def klass
-        @klass ||= Object.const_get(@association_options[:class_name])
+        @klass ||= Object.const_get(class_name)
       end
 
       def foreign_key
-        @association_options[:foreign_key]
+        @options[:foreign_key]
       end
 
       def association_primary_key
-        @association_options[:association_primary_key]
+        @options[:association_primary_key]
       end
     end
 
