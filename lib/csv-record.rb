@@ -9,6 +9,15 @@ module Kernel
 end
 
 module CsvRecord
+  class << self
+    def namespace=(value)
+      @namespace_string = value
+    end
+    def namespace
+      @namespace ||= @namespace_string.nil? ? Object : Object.const_get(@namespace_string)
+    end
+  end
+
   class Base
     attr_reader :attribute_mash
 
@@ -111,6 +120,15 @@ module CsvRecord
         master_find_by(true, attribute_values)
       end
 
+      def find(primary_key_value)
+        if primary_key
+          find_by(primary_key => primary_key_value)
+        else
+          # FIXME: ArgumentError is not really appropriate here.
+          raise ArgumentError.new("#{self.name} has no primary_key configured.")
+        end
+      end
+
       def master_find_by(singular=true, attribute_values={})
         if attribute_values.size == 0
           # nothing is given, so return nothing
@@ -126,6 +144,7 @@ module CsvRecord
             result = all(indexed_by: attribute_name)[attribute_value]
             singular ? result : Array(result)
           else
+            missing_index_warning(attribute_name)
             method_name = singular ? :find : :find_all
 
             all.send(method_name) {|object| object.send(attribute_name) == attribute_value}
@@ -148,7 +167,7 @@ module CsvRecord
           if csv_data[:indexed_by].key?(indexed_by)
             csv_data[:indexed_by][indexed_by]
           else
-            raise ArgumentError.new("#{self.name} is not indexed_by '#{indexed_by}'")
+            raise ArgumentError.new("#{self.name} is not indexed_by '#{indexed_by}'.")
           end
         else
           csv_data[:unindexed]
@@ -163,6 +182,10 @@ module CsvRecord
 
       def potential_foreign_key_attribute_names
         attribute_names.select {|name| name.end_with?('id')}
+      end
+
+      def missing_index_warning(attribute_name)
+        STDERR.puts("[WARNING] - missing index #{attribute_name}")
       end
 
       # helper methods
@@ -379,7 +402,7 @@ module CsvRecord
       end
 
       def klass
-        @klass ||= Object.const_get(class_name)
+        @klass ||= CsvRecord.namespace.const_get(class_name)
       end
 
       def foreign_key
