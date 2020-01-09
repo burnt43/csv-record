@@ -56,11 +56,17 @@ module CsvRecord
         @modify_attribute_name_config || {}
       end
 
+      attr_accessor :primary_key
+
       # association methods
 
       # TODO: guess missing options based on convention
       def belongs_to(attribute_name, options={})
-        reflection = CsvRecord::Reflection::BelongsToReflection.new(attribute_name.to_sym, options)
+        reflection = CsvRecord::Reflection::BelongsToReflection.new(
+          self,
+          attribute_name.to_sym,
+          options
+        )
         store_reflection(reflection)
 
         define_method attribute_name do
@@ -71,7 +77,11 @@ module CsvRecord
       end
 
       def has_many(attribute_name, options={})
-        reflection = CsvRecord::Reflection::HasManyReflection.new(attribute_name.to_sym, options)
+        reflection = CsvRecord::Reflection::HasManyReflection.new(
+          self,
+          attribute_name.to_sym,
+          options
+        )
         store_reflection(reflection)
 
         define_method attribute_name do
@@ -358,7 +368,8 @@ module CsvRecord
     class AssociationReflection
       attr_reader :name
 
-      def initialize(name, options={})
+      def initialize(csv_record, name, options={})
+        @csv_record = csv_record
         @name = name
         @options = options
       end
@@ -380,7 +391,16 @@ module CsvRecord
       end
     end
 
-    BelongsToReflection = Class.new(AssociationReflection)
-    HasManyReflection   = Class.new(AssociationReflection)
+    class BelongsToReflection < AssociationReflection
+      def association_primary_key
+        @options[:association_primary_key] || @klass.primary_key
+      end
+    end
+
+    class HasManyReflection < AssociationReflection
+      def association_primary_key
+        @options[:association_primary_key] || @csv_record.primary_key
+      end
+    end
   end # Reflection
 end # CsvRecord
