@@ -185,7 +185,7 @@ module CsvRecord
       end
 
       def missing_index_warning(attribute_name)
-        STDERR.puts("[WARNING] - missing index #{attribute_name}")
+        STDERR.puts("[WARNING] - missing index '#{attribute_name}'")
       end
 
       # helper methods
