@@ -86,7 +86,14 @@ module CsvRecord
       end
 
       def has_many(attribute_name, options={})
-        reflection = CsvRecord::Reflection::HasManyReflection.new(
+        reflection_type =
+          if options.key?(:through)
+            CsvRecord::Reflection::ThroughReflection
+          else
+            CsvRecord::Reflection::HasManyReflection
+          end
+
+        reflection = reflection_type.new(
           self,
           attribute_name.to_sym,
           options
@@ -96,7 +103,17 @@ module CsvRecord
         define_method attribute_name do
           reflection = self.class.reflect_on_association(attribute_name)
 
-          reflection.klass.find_all_by(reflection.foreign_key => send(reflection.association_primary_key))
+          if reflection.is_a?(CsvRecord::Reflection::HasManyReflection)
+            reflection.klass.find_all_by(
+              reflection.foreign_key => send(reflection.association_primary_key)
+            )
+          elsif reflection.is_a?(CsvRecord::Reflection::ThroughReflection)
+            reflection.through_reflection.klass.find_all_by(
+              reflection.through_reflection.foreign_key => send(reflection.through_reflection.association_primary_key)
+            ).map do |record|
+              record.send(reflection.source_reflection.name)
+            end
+          end
         end
       end
 
@@ -431,6 +448,24 @@ module CsvRecord
     class HasManyReflection < AssociationReflection
       def association_primary_key
         @options[:association_primary_key] || @csv_record.primary_key
+      end
+    end
+
+    class ThroughReflection < AssociationReflection
+      def through_association_name
+        @options[:through]
+      end
+
+      def source_association_name
+        @options[:source]
+      end
+
+      def through_reflection
+        @through_reflection ||= @csv_record.reflect_on_association(through_association_name)
+      end
+
+      def source_reflection
+        @source_reflection ||= through_reflection.klass.reflect_on_association(source_association_name)
       end
     end
   end # Reflection
