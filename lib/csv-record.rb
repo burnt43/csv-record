@@ -379,10 +379,18 @@ module CsvRecord
     end
 
     def method_missing(method_name, *args, &block)
-      unless method_name.to_s.end_with?('=')
-        # Assume this method is a lookup of an attribute and
-        # delegate to the mash object.
-        @attribute_mash.send(self.class.stored_attribute_name(method_name), *args, &block)
+      if method_name.to_s.end_with?('=')
+        super
+      else
+        stored_attribute_name = self.class.stored_attribute_name(method_name)
+
+        if @attribute_mash.respond_to?(stored_attribute_name)
+          # Assume this method is a lookup of an attribute and
+          # delegate to the mash object.
+          @attribute_mash.send(self.class.stored_attribute_name(method_name), *args, &block)
+        else
+          super
+        end
       end
     end
   end # Base
