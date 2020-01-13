@@ -114,9 +114,9 @@ module CsvRecord
           elsif reflection.is_a?(CsvRecord::Reflection::ThroughReflection)
             reflection.through_reflection.klass.find_all_by(
               reflection.through_reflection.foreign_key => send(reflection.through_reflection.association_primary_key)
-            ).map do |record|
-              record.send(reflection.source_reflection.name)
-            end
+            ).flat_map do |record|
+              record&.send(reflection.source_reflection.name)
+            end.compact
           end
         end
       end
@@ -206,7 +206,7 @@ module CsvRecord
       end
 
       def missing_index_warning(attribute_name)
-        STDERR.puts("[WARNING] - missing index '#{attribute_name}'")
+        STDERR.puts("[WARNING] - missing index '#{attribute_name}' on '#{name}'")
       end
 
       # helper methods
@@ -450,6 +450,10 @@ module CsvRecord
     end
 
     class HasManyReflection < AssociationReflection
+      def foreign_key
+        @options[:foreign_key] || @csv_record.primary_key
+      end
+
       def association_primary_key
         @options[:association_primary_key] || @csv_record.primary_key
       end
@@ -461,7 +465,7 @@ module CsvRecord
       end
 
       def source_association_name
-        @options[:source]
+        @options[:source] || @name.to_s.singularize.to_sym
       end
 
       def through_reflection
