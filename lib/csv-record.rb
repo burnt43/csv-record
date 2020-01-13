@@ -399,6 +399,16 @@ module CsvRecord
       end
     end
 
+    def primary_key_value
+      send(self.class.primary_key)
+    end
+
+    def ==(other)
+      return false unless self.class == other.class
+
+      primary_key_value == other.primary_key_value
+    end
+
     def method_missing(method_name, *args, &block)
       if method_name.to_s.end_with?('=')
         super
