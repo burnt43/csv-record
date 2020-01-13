@@ -266,11 +266,13 @@ module CsvRecord
           value_buffer      = String.new
 
           value_found_proc = Proc.new {
+            # puts "\033[0;32mVALUE FOUND\033[0;0m"
             value_buffer.blank? ? csv_record_buffer.push(nil) : csv_record_buffer.push(value_buffer.clone)
             value_buffer.clear
           }
+
           csv_record_found_proc = Proc.new {
-            #puts "\033[0;32m#{line_number}\033[0;0m #{csv_record_buffer.to_s}"
+            # puts "\033[0;33mRECORD FOUND\033[0;0m"
 
             unless csv_record_buffer.compact.empty?
               if line_number == 1 && first_line_contains_schema_info?
@@ -318,6 +320,15 @@ module CsvRecord
           number_of_chars = raw_file_string.length
 
           raw_file_string.each_char {|c|
+#             printf(
+#               "%-30s %s\n",
+#               parse_state,
+#               case c
+#               when "\r" then '\r'
+#               when "\n" then '\n'
+#               else c
+#               end
+#             )
             case parse_state
             when :outside_quote
               case c
@@ -339,8 +350,21 @@ module CsvRecord
                 parse_state = :quote_found_inside_quote
               when "\r"
                 # do nothing
+              when "\\"
+                parse_state = :possible_escape_sequence
               else
                 value_buffer << c
+              end
+            when :possible_escape_sequence
+              case c
+              when '"'
+                # this handles the case of escaping quotes with \"
+                value_buffer << c
+                parse_state = :inside_quote
+              else
+                value_buffer << "\\"
+                value_buffer << c
+                parse_state = :inside_quote
               end
             when :quote_found_inside_quote
               case c
@@ -354,8 +378,10 @@ module CsvRecord
               when "\r"
                 # do nothing
               when '"'
-                value_buffer << '"'
+                # this handles the case of escaping csv double quotes with another double quote
+                # example: ""this is a valid way to escape double quotes in csv""
                 value_buffer << c
+                parse_state = :inside_quote
               else
                 value_buffer << '"'
                 value_buffer << c
@@ -381,7 +407,8 @@ module CsvRecord
 
     def print_attributes(
       only: [],
-      except: []
+      except: [],
+      side_by_side: true
     )
       collection =
         if !only.empty?
@@ -395,7 +422,13 @@ module CsvRecord
         end
 
       collection.each do |attribute_name, attribute_value|
-        printf("%-40s %-40s\n", attribute_name, attribute_value)
+        if side_by_side
+          printf("%-40s %-40s\n", attribute_name, attribute_value)
+        else
+          puts '~'*50
+          puts "\033[0;32m#{attribute_name}\033[0;0m"
+          puts attribute_value
+        end
       end
     end
 
