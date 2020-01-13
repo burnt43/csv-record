@@ -81,7 +81,11 @@ module CsvRecord
         define_method attribute_name do
           reflection = self.class.reflect_on_association(attribute_name)
 
-          reflection.klass.find_by(reflection.association_primary_key => send(reflection.foreign_key))
+          if !(foreign_key_value = send(reflection.foreign_key)).blank?
+            reflection.klass.find_by(reflection.association_primary_key => foreign_key_value)
+          else
+            nil
+          end
         end
       end
 
