@@ -222,7 +222,8 @@ module CsvRecord
           .gsub(%r/[\.\+\|]/, '')  # characters to remove
           .gsub(%r/\//, '_')       # / becomes _
           .gsub(%r/#/, '_number')  # # becomes _number
-          .sub(%r/_\z/, '')        # trailing underscores are removed for Hashie compatibility
+          .sub(%r/_+\z/, '')       # trailing underscores are removed for Hashie compatibility
+          .sub(%r/\A_+/, '')       # leading underscores are removed
 
         if modify_attribute_name_config.key?(result.to_sym)
           modify_attribute_name_config[result.to_sym].to_s
