@@ -132,6 +132,22 @@ module CsvRecord
         stored_reflections[name]
       end
 
+      def enum(attribute_name, value_mapping={}, options={})
+        modified_mapping = Hash[value_mapping.map {|k, v| [k.to_s, v]}]
+
+        (@enum_options ||= {})[attribute_name.to_sym] = {
+          mapping: modified_mapping,
+          options: options
+        }
+
+        method_name = options[:as] || attribute_name
+
+        define_method method_name do
+          raw_value = lookup_attribute_value(attribute_name)
+          modified_mapping[raw_value]
+        end
+      end
+
       # finder methods
       def find_all_by(attribute_values={})
         master_find_by(false, attribute_values)
@@ -443,6 +459,10 @@ module CsvRecord
       primary_key_value == other.primary_key_value
     end
 
+    def lookup_attribute_value(attribute_name)
+      @attribute_mash.send(self.class.stored_attribute_name(attribute_name))
+    end
+
     def method_missing(method_name, *args, &block)
       if method_name.to_s.end_with?('=')
         super
@@ -452,7 +472,7 @@ module CsvRecord
         if @attribute_mash.respond_to?(stored_attribute_name)
           # Assume this method is a lookup of an attribute and
           # delegate to the mash object.
-          @attribute_mash.send(self.class.stored_attribute_name(method_name), *args, &block)
+          lookup_attribute_value(method_name)
         else
           super
         end
