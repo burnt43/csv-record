@@ -242,7 +242,11 @@ module CsvRecord
       end
 
       def missing_index_warning(attribute_name)
-        STDERR.puts("[WARNING] - missing index '#{attribute_name}' on '#{name}'")
+        STDERR.puts("[WARNING] - missing index on '#{attribute_name}' for '#{name}'")
+      end
+
+      def index_overflow_warning(attribute_name, value)
+        STDERR.puts("[WARNING] - index on '#{attribute_name}' with value '#{value}' for '#{name}' has overflowed. Consider setting 'has_many' to true")
       end
 
       # helper methods
@@ -339,10 +343,20 @@ module CsvRecord
                 result[:unindexed].push(object)
 
                 index_options.each {|attribute_name, options|
+                  key = object.send(attribute_name)
+
+                  next unless key
+
                   if options[:has_many]
                     ((result[:indexed_by][attribute_name] ||= {})[object.send(attribute_name)] ||= []).push(object)
                   else
-                    (result[:indexed_by][attribute_name] ||= {})[object.send(attribute_name)] = object
+                    result[:indexed_by][attribute_name] ||= {}
+
+                    if result[:indexed_by][attribute_name].key?(key)
+                      index_overflow_warning(attribute_name, key)
+                    end
+
+                    result[:indexed_by][attribute_name][key] = object
                   end
                 }
               end
