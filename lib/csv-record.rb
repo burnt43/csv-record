@@ -89,6 +89,21 @@ module CsvRecord
         end
       end
 
+      def has_one(attribute_name, options={})
+        reflection = CsvRecord::Reflection::HasOneReflection.new(
+          self,
+          attribute_name.to_sym,
+          options
+        )
+        store_reflection(reflection)
+
+        define_method attribute_name do
+          reflection = self.class.reflect_on_association(attribute_name)
+
+          reflection.klass.find_by(reflection.foreign_key => send(reflection.association_primary_key))
+        end
+      end
+
       def has_many(attribute_name, options={})
         reflection_type =
           if options.key?(:through)
@@ -108,6 +123,7 @@ module CsvRecord
           reflection = self.class.reflect_on_association(attribute_name)
 
           if reflection.is_a?(CsvRecord::Reflection::HasManyReflection)
+            # jcarson_debug "#{reflection.klass.name}.#{reflection.foreign_key} => #{send(reflection.association_primary_key)}"
             reflection.klass.find_all_by(
               reflection.foreign_key => send(reflection.association_primary_key)
             )
@@ -209,6 +225,10 @@ module CsvRecord
         else
           csv_data[:unindexed]
         end
+      end
+
+      def first
+        all[0]
       end
 
       # schema methods
@@ -459,6 +479,10 @@ module CsvRecord
       primary_key_value == other.primary_key_value
     end
 
+    def to_s
+      "#<#{self.class.name}:#{primary_key_value}>"
+    end
+
     def lookup_attribute_value(attribute_name)
       @attribute_mash.send(self.class.stored_attribute_name(attribute_name))
     end
@@ -509,7 +533,13 @@ module CsvRecord
 
     class BelongsToReflection < AssociationReflection
       def association_primary_key
-        @options[:association_primary_key] || @klass.primary_key
+        @options[:association_primary_key] || klass.primary_key
+      end
+    end
+
+    class HasOneReflection < AssociationReflection
+      def association_primary_key
+        @options[:association_primary_key] || @csv_record.primary_key
       end
     end
 
