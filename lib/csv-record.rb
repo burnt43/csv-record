@@ -494,7 +494,11 @@ module CsvRecord
     end
 
     def to_s
-      "#<#{self.class.name}:#{primary_key_value}>"
+      if self.class.primary_key
+        "#<#{self.class.name}:#{primary_key_value}>"
+      else
+        super
+      end
     end
 
     def lookup_attribute_value(attribute_name)
