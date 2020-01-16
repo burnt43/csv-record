@@ -442,6 +442,14 @@ module CsvRecord
             current_char += 1
           }
 
+          # ensure that the indexes exist, which may not exist if there
+          # was no data found.
+          index_options.each do |index_name, options|
+            next if result[:indexed_by].key?(index_name)
+
+            result[:indexed_by][index_name] = {}
+          end
+
           result
         )
       end
