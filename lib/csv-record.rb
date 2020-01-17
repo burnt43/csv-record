@@ -148,6 +148,10 @@ module CsvRecord
         stored_reflections[name]
       end
 
+      def reflect_on_all_associations
+        stored_reflections.values
+      end
+
       def enum(attribute_name, value_mapping={}, options={})
         modified_mapping = Hash[value_mapping.map {|k, v| [k.to_s, v]}]
 
@@ -533,6 +537,7 @@ module CsvRecord
   module Reflection
     class AssociationReflection
       attr_reader :name
+      attr_reader :options
 
       def initialize(csv_record, name, options={})
         @csv_record = csv_record
@@ -554,6 +559,10 @@ module CsvRecord
 
       def association_primary_key
         @options[:association_primary_key]
+      end
+
+      def collection?
+        false
       end
     end
 
@@ -577,6 +586,10 @@ module CsvRecord
       def association_primary_key
         @options[:association_primary_key] || @csv_record.primary_key
       end
+
+      def collection?
+        true
+      end
     end
 
     class ThroughReflection < AssociationReflection
@@ -594,6 +607,10 @@ module CsvRecord
 
       def source_reflection
         @source_reflection ||= through_reflection.klass.reflect_on_association(source_association_name)
+      end
+
+      def collection?
+        true
       end
     end
   end # Reflection
