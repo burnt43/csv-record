@@ -66,6 +66,9 @@ module CsvRecord
       end
 
       attr_accessor :primary_key
+      def primary_key?
+        !!primary_key
+      end
 
       # association methods
 
@@ -82,7 +85,12 @@ module CsvRecord
           reflection = self.class.reflect_on_association(attribute_name)
 
           if !(foreign_key_value = send(reflection.foreign_key)).blank?
-            reflection.klass.find_by(reflection.association_primary_key => foreign_key_value)
+            result = reflection.klass.find_by(reflection.association_primary_key => foreign_key_value)
+
+            # REVIEW: This line might be hacky. Why is belongs_to? returning multiple results?
+            # This is if the foreign_key is indexed and stores multiple values. This was written
+            # in response to weird schemas.
+            result.is_a?(Enumerable) ? result[0] : result
           else
             nil
           end
@@ -123,7 +131,6 @@ module CsvRecord
           reflection = self.class.reflect_on_association(attribute_name)
 
           if reflection.is_a?(CsvRecord::Reflection::HasManyReflection)
-            # jcarson_debug "#{reflection.klass.name}.#{reflection.foreign_key} => #{send(reflection.association_primary_key)}"
             reflection.klass.find_all_by(
               reflection.foreign_key => send(reflection.association_primary_key)
             )
@@ -502,7 +509,11 @@ module CsvRecord
     def ==(other)
       return false unless self.class == other.class
 
-      primary_key_value == other.primary_key_value
+      if self.class.primary_key?
+        primary_key_value == other.primary_key_value
+      else
+        super(other)
+      end
     end
 
     def to_s
@@ -563,6 +574,14 @@ module CsvRecord
 
       def collection?
         false
+      end
+
+      def inverse_association_name
+        @options[:inverse_of]
+      end
+
+      def inverse_reflection
+        klass.reflect_on_association(inverse_association_name)
       end
     end
 
