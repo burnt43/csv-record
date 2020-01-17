@@ -1,4 +1,5 @@
 require 'hashie'
+require 'pathname'
 require 'active_support/core_ext/object/blank'
 require 'active_support/core_ext/string/inflections'
 
@@ -13,8 +14,16 @@ module CsvRecord
     def namespace=(value)
       @namespace_string = value
     end
+
     def namespace
       @namespace ||= @namespace_string.nil? ? Object : Object.const_get(@namespace_string)
+    end
+
+    def root_dir=(value)
+      @root_dir = Pathname.new(value)
+    end
+    def root_dir
+      @root_dir || Pathname.new('.')
     end
   end
 
@@ -24,10 +33,14 @@ module CsvRecord
     class << self
       # config methods
       def csv_filename=(value)
-        @csv_filename = value
+        @csv_filename = Pathname.new(value)
       end
       def csv_filename
         @csv_filename
+      end
+
+      def full_csv_filename
+        CsvRecord.root_dir.join(csv_filename)
       end
 
       def first_line_contains_schema_info=(value)
@@ -311,7 +324,7 @@ module CsvRecord
         @csv_data ||= (
           result            = {unindexed:  [], indexed_by: {}}
           @attribute_names  = []
-          raw_file_string   = IO.read(csv_filename).force_encoding('iso-8859-1')
+          raw_file_string   = IO.read(full_csv_filename).force_encoding('iso-8859-1')
           line_number       = 1
           parse_state       = :outside_quote
           csv_record_buffer = []
