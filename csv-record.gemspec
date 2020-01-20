@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name        = 'csv-record'
-  s.version     = '0.0.1'
+  s.version     = '0.0.2'
   s.summary     = 'active_record-like, but for csv files'
   s.description = 'active_record-like, but for csv files'
   s.authors     = ['James Carson']
