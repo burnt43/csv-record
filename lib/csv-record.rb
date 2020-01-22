@@ -282,12 +282,14 @@ module CsvRecord
         result =
           input
           .underscore
-          .gsub(%r/\s+/, '_')      # white space becomes a single underscore
-          .gsub(%r/[\.\+\|]/, '')  # characters to remove
-          .gsub(%r/\//, '_')       # / becomes _
-          .gsub(%r/#/, '_number')  # # becomes _number
-          .sub(%r/_+\z/, '')       # trailing underscores are removed for Hashie compatibility
-          .sub(%r/\A_+/, '')       # leading underscores are removed
+          .gsub(%r/\s+/, '_')       # white space becomes a single underscore
+          .gsub(%r/[\.\+\|]/, '')   # characters to remove
+          .gsub(%r/\//, '_')        # / becomes _
+          .gsub(%r/#/, '_number')   # # becomes _number
+          .sub(%r/_+\z/, '')        # trailing underscores are removed for Hashie compatibility
+          .sub(%r/\A_+/, '')        # leading underscores are removed
+          .sub(%r/\A2nd/, 'second') # replace leading ordinals
+          .sub(%r/\A3rd/, 'third')  # replace leading ordinals
 
         if modify_attribute_name_config.key?(result.to_sym)
           modify_attribute_name_config[result.to_sym].to_s
