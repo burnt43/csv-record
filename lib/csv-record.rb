@@ -516,6 +516,8 @@ module CsvRecord
     end
 
     def primary_key_value
+      return unless self.class.primary_key?
+
       send(self.class.primary_key)
     end
 
