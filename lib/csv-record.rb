@@ -184,7 +184,7 @@ module CsvRecord
         class_method_name = method_name.to_s.pluralize.to_sym
 
         singleton_class.define_method(class_method_name) do
-          options
+          value_mapping
         end
 
         define_method method_name do
