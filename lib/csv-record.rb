@@ -183,7 +183,7 @@ module CsvRecord
         method_name = options[:as] || attribute_name
         class_method_name = method_name.to_s.pluralize.to_sym
 
-        singleton_class.define_method(class_method_name) do
+        define_singleton_method class_method_name do
           value_mapping
         end
 
