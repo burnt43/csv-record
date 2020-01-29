@@ -22,9 +22,12 @@ module CsvRecord
     def root_dir=(value)
       @root_dir = Pathname.new(value)
     end
+
     def root_dir
       @root_dir || Pathname.new('.')
     end
+
+    attr_accessor :encoding
   end
 
   class Base
@@ -339,7 +342,16 @@ module CsvRecord
 
           value_found_proc = Proc.new {
             # puts "\033[0;32mVALUE FOUND\033[0;0m"
-            value_buffer.blank? ? csv_record_buffer.push(nil) : csv_record_buffer.push(value_buffer.clone)
+            if value_buffer.blank?
+              csv_record_buffer.push(nil)
+            else
+              new_value = value_buffer.clone
+
+              csv_record_buffer.push(
+                CsvRecord.encoding ? new_value.encode(CsvRecord.encoding) : new_value
+              )
+            end
+
             value_buffer.clear
           }
 
